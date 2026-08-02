@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CSV &rarr; TLE Converter</title>
+  <style>
+    :root {
+      --bg: #f4f6fb; --card: #ffffff; --ink: #1b2333; --muted: #66718a;
+      --accent: #2f6fed; --accent-ink: #ffffff; --border: #d9e0ee;
+      --drop: #eef3fe; --drop-active: #dbe7ff; --ok: #17864a; --err: #c02b2b;
+      --code-bg: #0f1626; --code-ink: #d6e2ff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1220; --card: #151c2e; --ink: #eaf0ff; --muted: #98a3bd;
+        --accent: #5b8dff; --accent-ink: #0d1220; --border: #263248;
+        --drop: #172137; --drop-active: #1f2d4d; --ok: #3ddc84; --err: #ff6b6b;
+        --code-bg: #0a0f1c; --code-ink: #cddcff;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg); color: var(--ink); display: flex; justify-content: center; padding: 32px 16px;
+    }
+    main { width: 100%; max-width: 620px; }
+    h1 { font-size: 1.6rem; margin: 0 0 4px; }
+    .sub { color: var(--muted); margin: 0 0 24px; font-size: .95rem; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 22px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+    #drop {
+      border: 2px dashed var(--border); border-radius: 12px; background: var(--drop);
+      padding: 40px 20px; text-align: center; cursor: pointer; transition: background .15s, border-color .15s;
+    }
+    #drop.hover { background: var(--drop-active); border-color: var(--accent); }
+    #drop .icon { font-size: 2.4rem; line-height: 1; }
+    #drop p { margin: 12px 0 4px; font-weight: 600; }
+    #drop small { color: var(--muted); }
+    .btn {
+      display: inline-block; margin-top: 16px; background: var(--accent); color: var(--accent-ink);
+      border: none; border-radius: 9px; padding: 10px 18px; font-size: .95rem; font-weight: 600; cursor: pointer;
+    }
+    .btn:hover { filter: brightness(1.05); }
+    #status { margin-top: 18px; font-size: .95rem; min-height: 1.4em; }
+    #status .ok { color: var(--ok); font-weight: 600; }
+    #status .err { color: var(--err); font-weight: 600; white-space: pre-wrap; }
+    #status .note { color: var(--muted); display: block; margin-top: 6px; font-size: .85rem; }
+    details { margin-top: 18px; }
+    summary { cursor: pointer; color: var(--muted); font-size: .9rem; }
+    pre { background: var(--code-bg); color: var(--code-ink); padding: 12px 14px; border-radius: 9px; overflow-x: auto; font-size: .8rem; margin: 10px 0 0; }
+    footer { color: var(--muted); font-size: .82rem; margin-top: 22px; text-align: center; }
+    footer a { color: var(--accent); }
+    ol { margin: 4px 0 0; padding-left: 20px; color: var(--muted); font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Satellite CSV &rarr; TLE Converter</h1>
+    <p class="sub">Convert CelesTrak OMM (CSV) ephemeris data to NORAD two-line element sets &mdash; entirely in your browser. Nothing is uploaded.</p>
+
+    <div class="card">
+      <div id="drop" tabindex="0" role="button" aria-label="Drop a CSV file or click to browse">
+        <div class="icon">🛰️</div>
+        <p>Drag &amp; drop a CSV file here</p>
+        <small>CelesTrak OMM / CSV format</small>
+        <div><button type="button" class="btn" id="pick">Choose CSV file&hellip;</button></div>
+        <input type="file" id="file" accept=".csv,text/csv" multiple hidden />
+      </div>
+
+      <div id="status"></div>
+
+      <details>
+        <summary>What does this expect &amp; produce?</summary>
+        <p style="color:var(--muted);font-size:.88rem;margin:10px 0 2px;">
+          <strong>Input</strong> &mdash; a CSV with the CelesTrak GP/OMM header
+          (<code>OBJECT_NAME, OBJECT_ID, EPOCH, MEAN_MOTION, ECCENTRICITY, INCLINATION, &hellip;, NORAD_CAT_ID, &hellip;</code>).
+          Get one at
+          <a href="https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&amp;FORMAT=csv" target="_blank" rel="noopener">celestrak.org</a>
+          (choose <em>CSV</em> as the format).
+        </p>
+        <p style="color:var(--muted);font-size:.88rem;margin:8px 0 2px;">
+          <strong>Output</strong> &mdash; a standard NORAD 3-line TLE file, saved with the same base name and a
+          <code>.tle</code> extension (e.g. <code>stations.csv</code> &rarr; <code>stations.tle</code>).
+        </p>
+      </details>
+    </div>
+
+    <footer>
+      Runs 100% offline in your browser &middot; open-source &middot;
+      <span id="dl-note">files save to your browser's download location</span>
+    </footer>
+  </main>
+
+  <script src="converter.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var drop = document.getElementById('drop');
+      var input = document.getElementById('file');
+      var pick = document.getElementById('pick');
+      var status = document.getElementById('status');
+
+      function show(html) { status.innerHTML = html; }
+
+      function baseName(name) {
+        var dot = name.lastIndexOf('.');
+        return dot > 0 ? name.slice(0, dot) : name;
+      }
+
+      function saveFile(filename, text) {
+        var blob = new Blob([text], { type: 'text/plain' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        // revoke on next tick so the download has a chance to start
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+      }
+
+      function handleFile(file) {
+        var reader = new FileReader();
+        reader.onload = function () {
+          var outName = baseName(file.name) + '.tle';
+          try {
+            var result = window.CSVtoTLE.convertCSVtoTLE(String(reader.result));
+            saveFile(outName, result.text);
+            var msg = '<span class="ok">✓ Converted ' + result.count +
+                      ' object' + (result.count === 1 ? '' : 's') + ' &rarr; ' +
+                      escapeHtml(outName) + '</span>';
+            if (result.errors && result.errors.length) {
+              msg += '<span class="note">' + result.errors.length +
+                     ' row(s) skipped:\n' + escapeHtml(result.errors.join('\n')) + '</span>';
+            }
+            msg += '<span class="note">Saved to your browser’s download location.</span>';
+            show(msg);
+          } catch (e) {
+            show('<span class="err">✗ ' + escapeHtml(file.name) + ': ' + escapeHtml(e.message) + '</span>');
+          }
+        };
+        reader.onerror = function () {
+          show('<span class="err">✗ Could not read ' + escapeHtml(file.name) + '</span>');
+        };
+        reader.readAsText(file);
+      }
+
+      function handleFiles(files) {
+        if (!files || !files.length) return;
+        show('');
+        // Convert whatever was dropped; the converter itself validates the format
+        // and reports a clear error for non-OMM files.
+        Array.prototype.forEach.call(files, function (f) { if (f) handleFile(f); });
+      }
+
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"]/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+        });
+      }
+
+      // Click / keyboard to open the file browser
+      pick.addEventListener('click', function (e) { e.stopPropagation(); input.click(); });
+      drop.addEventListener('click', function () { input.click(); });
+      drop.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+      });
+      input.addEventListener('change', function () { handleFiles(input.files); input.value = ''; });
+
+      // Drag & drop
+      ['dragenter', 'dragover'].forEach(function (ev) {
+        drop.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); drop.classList.add('hover'); });
+      });
+      ['dragleave', 'drop'].forEach(function (ev) {
+        drop.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); drop.classList.remove('hover'); });
+      });
+      drop.addEventListener('drop', function (e) {
+        var dt = e.dataTransfer;
+        if (dt && dt.files) handleFiles(dt.files);
+      });
+      // Prevent the browser from navigating if a file is dropped outside the zone
+      window.addEventListener('dragover', function (e) { e.preventDefault(); });
+      window.addEventListener('drop', function (e) { e.preventDefault(); });
+    })();
+  </script>
+</body>
+</html>
