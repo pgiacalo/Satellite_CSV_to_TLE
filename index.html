@@ -51,6 +51,27 @@
     footer { color: var(--muted); font-size: .82rem; margin-top: 22px; text-align: center; }
     footer a { color: var(--accent); }
     ol { margin: 4px 0 0; padding-left: 20px; color: var(--muted); font-size: .85rem; }
+    /* result cards */
+    .result { border: 1px solid var(--border); border-radius: 11px; padding: 14px 16px; margin-top: 14px; background: var(--drop); }
+    .result .ok { color: var(--ok); font-weight: 700; }
+    .result .fname { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.05rem; font-weight: 700; margin: 6px 0 2px; word-break: break-all; }
+    .result .where { color: var(--muted); font-size: .9rem; }
+    .result .where strong { color: var(--ink); }
+    .result .actions { display: flex; gap: 8px; margin: 12px 0 0; flex-wrap: wrap; }
+    .btn.small { margin-top: 0; padding: 7px 12px; font-size: .85rem; }
+    .btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+    pre.preview { max-height: 220px; overflow: auto; }
+    .result .warn { color: var(--err); font-size: .82rem; margin-top: 10px; white-space: pre-wrap; }
+    .result .tip { color: var(--muted); font-size: .8rem; margin-top: 10px; line-height: 1.45; }
+    .result .tip strong { color: var(--ink); }
+    .result.error { background: transparent; border-color: var(--err); }
+    .result.error .msg { color: var(--err); font-weight: 600; white-space: pre-wrap; }
+    /* output-extension toggle */
+    .opt { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; margin-top: 16px; font-size: .9rem; color: var(--muted); }
+    .opt .lbl { font-weight: 600; color: var(--ink); }
+    .opt label { display: inline-flex; align-items: baseline; gap: 5px; cursor: pointer; }
+    .opt code { background: var(--drop); padding: 1px 5px; border-radius: 5px; }
+    .opt small { color: var(--muted); }
   </style>
 </head>
 <body>
@@ -67,6 +88,12 @@
         <input type="file" id="file" accept=".csv,text/csv" multiple hidden />
       </div>
 
+      <div class="opt">
+        <span class="lbl">Output file type:</span>
+        <label><input type="radio" name="ext" value="txt" checked> <code>.txt</code> <small>&mdash; opens in your text editor</small></label>
+        <label><input type="radio" name="ext" value="tle"> <code>.tle</code> <small>&mdash; standard NORAD extension</small></label>
+      </div>
+
       <div id="status"></div>
 
       <details>
@@ -79,15 +106,17 @@
           (choose <em>CSV</em> as the format).
         </p>
         <p style="color:var(--muted);font-size:.88rem;margin:8px 0 2px;">
-          <strong>Output</strong> &mdash; a standard NORAD 3-line TLE file, saved with the same base name and a
-          <code>.tle</code> extension (e.g. <code>stations.csv</code> &rarr; <code>stations.tle</code>).
+          <strong>Output</strong> &mdash; a standard NORAD two-line element file with the <em>same name</em> as the
+          input, only the extension changes (e.g. <code>stations.csv</code> &rarr; <code>stations.txt</code>).
+          The default <code>.txt</code> opens straight in your text editor; switch to <code>.tle</code> above if a
+          downstream tool expects that extension.
         </p>
       </details>
     </div>
 
     <footer>
       Runs 100% offline in your browser &middot; open-source &middot;
-      <span id="dl-note">files save to your browser's download location</span>
+      <span id="dl-note">files save to your browser's Downloads folder</span>
     </footer>
   </main>
 
@@ -100,11 +129,12 @@
       var pick = document.getElementById('pick');
       var status = document.getElementById('status');
 
-      function show(html) { status.innerHTML = html; }
-
-      function baseName(name) {
-        var dot = name.lastIndexOf('.');
-        return dot > 0 ? name.slice(0, dot) : name;
+      // Keep the input's base name; only swap the extension (stations.csv -> stations.txt/.tle).
+      function outputName(inputName) {
+        var dot = inputName.lastIndexOf('.');
+        var base = dot > 0 ? inputName.slice(0, dot) : inputName;
+        var ext = (document.querySelector('input[name="ext"]:checked') || {}).value || 'txt';
+        return base + '.' + ext;
       }
 
       function saveFile(filename, text) {
@@ -120,35 +150,99 @@
         setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
       }
 
+      // Open the generated TLE text in a new browser tab (a page can't open the
+      // downloaded local file itself, so we render the same content in-browser).
+      function openInTab(text) {
+        var blob = new Blob([text], { type: 'text/plain' });
+        var url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+      }
+
+      function copyText(text, btn) {
+        var restore = btn.textContent;
+        var done = function () { btn.textContent = '✓ Copied'; setTimeout(function () { btn.textContent = restore; }, 1500); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });
+        } else { fallbackCopy(text); done(); }
+      }
+      function fallbackCopy(text) {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+      }
+
+      function el(tag, cls, html) {
+        var n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (html != null) n.innerHTML = html;
+        return n;
+      }
+
+      function renderResult(outName, result) {
+        var block = el('div', 'result');
+        var n = result.count;
+        block.appendChild(el('div', null,
+          '<span class="ok">✓ Converted ' + n + ' object' + (n === 1 ? '' : 's') + '</span>' +
+          '<div class="fname">📄 ' + escapeHtml(outName) + '</div>' +
+          '<div class="where">Saved to your browser’s <strong>Downloads</strong> folder.</div>'));
+
+        var actions = el('div', 'actions');
+        var viewBtn = el('button', 'btn small', '👁 View');
+        var copyBtn = el('button', 'btn small ghost', '📋 Copy');
+        viewBtn.type = copyBtn.type = 'button';
+        actions.appendChild(viewBtn);
+        actions.appendChild(copyBtn);
+        block.appendChild(actions);
+
+        var pre = el('pre', 'preview');
+        pre.textContent = result.text;
+        block.appendChild(pre);
+
+        if (result.errors && result.errors.length) {
+          block.appendChild(el('div', 'warn',
+            result.errors.length + ' row(s) skipped:\n' + escapeHtml(result.errors.join('\n'))));
+        }
+
+        block.appendChild(el('div', 'tip',
+          'Can’t find the file? Open your browser’s downloads (<strong>' +
+          (isMac() ? '⌘' : 'Ctrl') + '+J</strong>) and choose <strong>Show in folder</strong>.'));
+
+        viewBtn.addEventListener('click', function () { openInTab(result.text); });
+        copyBtn.addEventListener('click', function () { copyText(result.text, copyBtn); });
+
+        status.insertBefore(block, status.firstChild);
+      }
+
+      function renderError(fileName, message) {
+        var block = el('div', 'result error',
+          '<div class="msg">✗ ' + escapeHtml(fileName) + ': ' + escapeHtml(message) + '</div>');
+        status.insertBefore(block, status.firstChild);
+      }
+
+      function isMac() { return /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || ''); }
+
       function handleFile(file) {
         var reader = new FileReader();
         reader.onload = function () {
-          var outName = baseName(file.name) + '.tle';
+          var outName = outputName(file.name);
           try {
             var result = window.CSVtoTLE.convertCSVtoTLE(String(reader.result));
             saveFile(outName, result.text);
-            var msg = '<span class="ok">✓ Converted ' + result.count +
-                      ' object' + (result.count === 1 ? '' : 's') + ' &rarr; ' +
-                      escapeHtml(outName) + '</span>';
-            if (result.errors && result.errors.length) {
-              msg += '<span class="note">' + result.errors.length +
-                     ' row(s) skipped:\n' + escapeHtml(result.errors.join('\n')) + '</span>';
-            }
-            msg += '<span class="note">Saved to your browser’s download location.</span>';
-            show(msg);
+            renderResult(outName, result);
           } catch (e) {
-            show('<span class="err">✗ ' + escapeHtml(file.name) + ': ' + escapeHtml(e.message) + '</span>');
+            renderError(file.name, e.message);
           }
         };
-        reader.onerror = function () {
-          show('<span class="err">✗ Could not read ' + escapeHtml(file.name) + '</span>');
-        };
+        reader.onerror = function () { renderError(file.name, 'could not read file'); };
         reader.readAsText(file);
       }
 
       function handleFiles(files) {
         if (!files || !files.length) return;
-        show('');
+        status.innerHTML = '';
         // Convert whatever was dropped; the converter itself validates the format
         // and reports a clear error for non-OMM files.
         Array.prototype.forEach.call(files, function (f) { if (f) handleFile(f); });

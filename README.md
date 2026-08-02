@@ -12,8 +12,11 @@ element sets (TLE)**. Drag-and-drop a `.csv` file and it downloads the matching
 - **Drag & drop** a CSV, or **click to browse** for one.
 - Converts every satellite in the file to a standard 3-line TLE (name + line 1 + line 2),
   with correct fixed-column formatting and mod-10 checksums.
-- Output file gets the **same base name** with a `.tle` extension
-  (`stations.csv` → `stations.tle`).
+- Output keeps the **same base name** as the input; only the extension changes
+  (`stations.csv` → `stations.txt`). A toggle switches between `.txt` (default —
+  opens straight in your text editor) and `.tle` (standard NORAD extension).
+- After each conversion you get a clear "saved to Downloads" message, an inline
+  **preview**, a **View** button (opens the result in a new tab), and a **Copy** button.
 - No servers, no tracking, no build step, no dependencies. Works offline.
 - **No File System Access API** — uses a plain download, so it works in every browser.
 
@@ -33,22 +36,25 @@ Grab one from CelesTrak by choosing **CSV** as the format, e.g.
 <https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=csv>
 
 **Output** — a standard NORAD/TLE file, byte-for-byte compatible with CelesTrak's
-own TLE export (verified against 800+ live satellites; see *Testing*).
+own TLE export (verified against 800+ live satellites; see *Testing*). The file
+keeps the input's base name and gets a `.txt` (default) or `.tle` extension.
 
 ## A note on where the file is saved
 
-The brief asked for the `.tle` to land *in the same folder as the input CSV, with
+The brief asked for the output to land *in the same folder as the input CSV, with
 the same name*. Writing back to the input's exact folder is **only** possible with
 the browser **File System Access API**, which the brief also asked to avoid (and
-which several browsers don't support). So instead:
+which several browsers don't support). For the same security reason, a web page
+cannot open your OS file manager or launch a local file. So instead:
 
-- the output keeps the **same base name** with a `.tle` extension, and
-- it saves to your **browser's download location** (usually `~/Downloads`, or
-  wherever you've pointed downloads).
+- the output keeps the **same base name** (only the extension changes), and
+- it saves to your **browser's Downloads folder**, with a clear on-screen message,
+  an inline preview, and **View** / **Copy** buttons for the generated data.
 
-If you'd rather it truly overwrite alongside the source file, that requires the
-File System Access API and a permission prompt — happy to add it as an optional
-"advanced" mode. Just say the word.
+**Why `.txt` by default?** macOS/Windows don't recognize the `.tle` extension, so
+double-clicking a `.tle` file pops an "open with…" prompt. Saving as `.txt` makes
+it open directly in your text editor. Flip the toggle to `.tle` if a downstream
+tool needs that extension.
 
 ## Deploying to GitHub Pages
 
