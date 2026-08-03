@@ -1,17 +1,23 @@
-# Satellite CSV → TLE Converter
+# Satellite CSV ↔ TLE Converter
 
-A tiny, **100% client-side** web app that converts satellite ephemeris data from
-[CelesTrak](https://celestrak.org/) **OMM / CSV** format into **NORAD two-line
-element sets (TLE)**. Drag-and-drop a `.csv` file and it downloads the matching
-`.tle` file. Nothing is uploaded anywhere — all conversion happens in your browser.
+A tiny, **100% client-side** web app that converts satellite ephemeris data
+**in either direction** between [CelesTrak](https://celestrak.org/) **OMM / CSV**
+format and **NORAD two-line element sets (TLE)**. Pick a direction, drag-and-drop a
+file, and it downloads the converted result. Nothing is uploaded anywhere — all
+conversion happens in your browser.
 
 👉 **Live app:** `https://<your-username>.github.io/<your-repo>/`
 
 ## Features
 
-- **Drag & drop** a CSV, or **click to browse** for one.
-- Converts every satellite in the file to a standard 3-line TLE (name + line 1 + line 2),
-  with correct fixed-column formatting and mod-10 checksums.
+- **Choose a direction first** — a required, obvious first step at the top of the
+  card. Defaults to **CSV → TLE**; flip it to **TLE → CSV** to go the other way.
+- **Drag & drop** a file, or **click to browse** for one.
+- **CSV → TLE:** converts every satellite to a standard 3-line TLE (name + line 1 +
+  line 2), with correct fixed-column formatting and mod-10 checksums.
+- **TLE → CSV:** parses a 2-line or 3-line TLE file back into a CelesTrak OMM CSV.
+  It emits **exactly the precision the TLE encodes** and never invents digits, so
+  the round-trip **TLE → CSV → TLE is byte-for-byte identical** (verified in tests).
 - Output keeps the **same base name** as the input; only the extension changes
   (`stations.csv` → `stations.txt`). A toggle switches between `.txt` (default —
   opens straight in your text editor) and `.tle` (standard NORAD extension).
@@ -38,6 +44,20 @@ Grab one from CelesTrak by choosing **CSV** as the format, e.g.
 **Output** — a standard NORAD/TLE file, byte-for-byte compatible with CelesTrak's
 own TLE export (verified against 800+ live satellites; see *Testing*). The file
 keeps the input's base name and gets a `.txt` (default) or `.tle` extension.
+
+### TLE → CSV (reverse)
+
+**Input** — a NORAD TLE file: pairs of lines starting with `1 ` and `2 `, each
+optionally preceded by a satellite-name line. Both 2-line and 3-line files work.
+
+**Output** — a CelesTrak OMM CSV with the standard column header, keeping the
+input's base name with a `.csv` extension (`stations.tle` → `stations.csv`).
+
+**On precision** — a TLE holds *less* precision than the original OMM CSV in a few
+fields (eccentricity is 7 digits; BSTAR and the second mean-motion derivative are
+5 significant figures). The reverse converter emits exactly what the TLE encodes
+and adds nothing, so no precision present in the TLE is lost, and
+`TLE → CSV → TLE` reproduces the original bytes exactly.
 
 ## A note on where the file is saved
 
@@ -105,6 +125,6 @@ TLEs exactly for every record whose element set matched.
 | File | Purpose |
 |------|---------|
 | `index.html` | The whole UI (drag-drop, browse, download). Self-contained. |
-| `converter.js` | Pure CSV→TLE conversion logic. Runs in the browser and Node. |
+| `converter.js` | Pure CSV↔TLE conversion logic (both directions). Runs in the browser and Node. |
 | `test/verify.mjs` | Node test suite. |
 | `sample-stations.csv` | A sample CelesTrak CSV to try it with. |

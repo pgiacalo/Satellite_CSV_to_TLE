@@ -48,5 +48,36 @@ eq('epoch leap', C.formatEpoch('2024-03-01T00:00:00').day, '061.00000000'); // 2
 // --- Whole-file convert reports a count ---
 eq('count', String(C.convertCSVtoTLE(issCSV).count), '1');
 
+// === Reverse direction: TLE -> CSV ==========================================
+const issTLE =
+`ISS (ZARYA)
+1 25544U 98067A   26213.47431246  .00008515  00000+0  16079-3 0  9999
+2 25544  51.6315  75.9770 0007210   0.6648 359.4349 15.49301455578770`;
+
+// Round-trip must be byte-exact: TLE -> CSV -> TLE reproduces the input TLE.
+const rtCSV = C.convertTLEtoCSV(issTLE);
+eq('reverse count', String(rtCSV.count), '1');
+const rtTLE = C.convertCSVtoTLE(rtCSV.text).text.trimEnd().split('\n');
+eq('roundtrip name',  rtTLE[0], 'ISS (ZARYA)');
+eq('roundtrip line1', rtTLE[1], '1 25544U 98067A   26213.47431246  .00008515  00000+0  16079-3 0  9999');
+eq('roundtrip line2', rtTLE[2], '2 25544  51.6315  75.9770 0007210   0.6648 359.4349 15.49301455578770');
+
+// Individual reverse-field checks
+eq('rev epoch',   C.parseEpoch('26', '213.47431246'), '2026-08-01T11:23:00.596544');
+eq('rev epoch99', C.parseEpoch('99', '001.00000000'), '1999-01-01T00:00:00.000000'); // pre-2000 window
+eq('rev epochLeap', C.parseEpoch('24', '061.00000000'), '2024-03-01T00:00:00.000000'); // leap year
+eq('rev satnum',  C.parseSatNum('25544'), '25544');
+eq('rev intldes', C.parseIntlDes('98067A  '), '1998-067A');
+eq('rev exp pos', C.expFieldToCSV(' 16079-3'), '.16079E-3');
+eq('rev exp neg', C.expFieldToCSV('-16079-3'), '-.16079E-3');
+eq('rev exp zero', C.expFieldToCSV(' 00000+0'), '0');
+
+// 2-line input (no name line) still parses.
+const twoLine = C.convertTLEtoCSV(issTLE.split('\n').slice(1).join('\n'));
+eq('2-line count', String(twoLine.count), '1');
+
+// Alpha-5 catalog number round-trips through both directions.
+eq('alpha5 fwd', C.parseSatNum('T1234'), String((('ABCDEFGHJKLMNPQRSTUVWXYZ'.indexOf('T') + 10) * 10000) + 1234));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

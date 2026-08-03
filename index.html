@@ -66,6 +66,30 @@
     .result .tip strong { color: var(--ink); }
     .result.error { background: transparent; border-color: var(--err); }
     .result.error .msg { color: var(--err); font-weight: 600; white-space: pre-wrap; }
+    /* direction selector — the required first step */
+    .direction { margin: 0 0 20px; }
+    .direction .lbl {
+      display: block; font-weight: 700; color: var(--ink); font-size: .9rem;
+      margin: 0 0 8px; letter-spacing: .01em;
+    }
+    .direction .lbl .req { color: var(--accent); font-weight: 700; }
+    .seg {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .seg label {
+      position: relative; display: flex; flex-direction: column; gap: 2px;
+      border: 2px solid var(--border); border-radius: 11px; padding: 12px 14px;
+      cursor: pointer; background: var(--card); transition: border-color .15s, background .15s;
+    }
+    .seg label:hover { border-color: var(--accent); }
+    .seg input { position: absolute; opacity: 0; pointer-events: none; }
+    .seg .name { font-weight: 700; font-size: 1.02rem; color: var(--ink); }
+    .seg .desc { font-size: .8rem; color: var(--muted); }
+    .seg label:has(input:checked) {
+      border-color: var(--accent); background: var(--drop-active);
+      box-shadow: 0 0 0 1px var(--accent) inset;
+    }
+    .seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
     /* output-extension toggle */
     .opt { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; margin-top: 16px; font-size: .9rem; color: var(--muted); }
     .opt .lbl { font-weight: 600; color: var(--ink); }
@@ -76,41 +100,75 @@
 </head>
 <body>
   <main>
-    <h1>Satellite CSV &rarr; TLE Converter</h1>
-    <p class="sub">Convert CelesTrak OMM (CSV) ephemeris data to NORAD two-line element sets &mdash; entirely in your browser. Nothing is uploaded.</p>
+    <h1>Satellite CSV &harr; TLE Converter</h1>
+    <p class="sub">Convert between CelesTrak OMM (CSV) ephemeris data and NORAD two-line element sets, in either direction &mdash; entirely in your browser. Nothing is uploaded.</p>
 
     <div class="card">
-      <div id="drop" tabindex="0" role="button" aria-label="Drop a CSV file or click to browse">
+      <div class="direction">
+        <span class="lbl">Step 1 &mdash; choose a conversion direction <span class="req">(required)</span></span>
+        <div class="seg" role="radiogroup" aria-label="Conversion direction">
+          <label>
+            <input type="radio" name="dir" value="csv2tle" checked>
+            <span class="name">CSV &rarr; TLE</span>
+            <span class="desc">CelesTrak OMM CSV &rarr; NORAD two-line elements</span>
+          </label>
+          <label>
+            <input type="radio" name="dir" value="tle2csv">
+            <span class="name">TLE &rarr; CSV</span>
+            <span class="desc">NORAD two-line elements &rarr; CelesTrak OMM CSV</span>
+          </label>
+        </div>
+      </div>
+
+      <div id="drop" tabindex="0" role="button" aria-label="Drop a file or click to browse">
         <div class="icon">🛰️</div>
-        <p>Drag &amp; drop a CSV file here</p>
-        <small>CelesTrak OMM / CSV format</small>
-        <div><button type="button" class="btn" id="pick">Choose CSV file&hellip;</button></div>
+        <p><span id="drop-verb">Drag &amp; drop a CSV file here</span></p>
+        <small id="drop-hint">CelesTrak OMM / CSV format</small>
+        <div><button type="button" class="btn" id="pick">Choose file&hellip;</button></div>
         <input type="file" id="file" accept=".csv,text/csv" multiple hidden />
       </div>
 
-      <div class="opt">
+      <div class="opt" id="ext-opt">
         <span class="lbl">Output file type:</span>
         <label><input type="radio" name="ext" value="txt" checked> <code>.txt</code> <small>&mdash; opens in your text editor</small></label>
         <label><input type="radio" name="ext" value="tle"> <code>.tle</code> <small>&mdash; standard NORAD extension</small></label>
+      </div>
+      <div class="opt" id="ext-note" hidden>
+        <span class="lbl">Output file type:</span>
+        <span><code>.csv</code> <small>&mdash; standard CelesTrak OMM / CSV format</small></span>
       </div>
 
       <div id="status"></div>
 
       <details>
         <summary>What does this expect &amp; produce?</summary>
-        <p style="color:var(--muted);font-size:.88rem;margin:10px 0 2px;">
-          <strong>Input</strong> &mdash; a CSV with the CelesTrak GP/OMM header
-          (<code>OBJECT_NAME, OBJECT_ID, EPOCH, MEAN_MOTION, ECCENTRICITY, INCLINATION, &hellip;, NORAD_CAT_ID, &hellip;</code>).
-          Get one at
-          <a href="https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&amp;FORMAT=csv" target="_blank" rel="noopener">celestrak.org</a>
-          (choose <em>CSV</em> as the format).
-        </p>
-        <p style="color:var(--muted);font-size:.88rem;margin:8px 0 2px;">
-          <strong>Output</strong> &mdash; a standard NORAD two-line element file with the <em>same name</em> as the
-          input, only the extension changes (e.g. <code>stations.csv</code> &rarr; <code>stations.txt</code>).
-          The default <code>.txt</code> opens straight in your text editor; switch to <code>.tle</code> above if a
-          downstream tool expects that extension.
-        </p>
+        <div id="help-csv2tle">
+          <p style="color:var(--muted);font-size:.88rem;margin:10px 0 2px;">
+            <strong>Input</strong> &mdash; a CSV with the CelesTrak GP/OMM header
+            (<code>OBJECT_NAME, OBJECT_ID, EPOCH, MEAN_MOTION, ECCENTRICITY, INCLINATION, &hellip;, NORAD_CAT_ID, &hellip;</code>).
+            Get one at
+            <a href="https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&amp;FORMAT=csv" target="_blank" rel="noopener">celestrak.org</a>
+            (choose <em>CSV</em> as the format).
+          </p>
+          <p style="color:var(--muted);font-size:.88rem;margin:8px 0 2px;">
+            <strong>Output</strong> &mdash; a standard NORAD two-line element file with the <em>same name</em> as the
+            input, only the extension changes (e.g. <code>stations.csv</code> &rarr; <code>stations.txt</code>).
+            The default <code>.txt</code> opens straight in your text editor; switch to <code>.tle</code> above if a
+            downstream tool expects that extension.
+          </p>
+        </div>
+        <div id="help-tle2csv" hidden>
+          <p style="color:var(--muted);font-size:.88rem;margin:10px 0 2px;">
+            <strong>Input</strong> &mdash; a NORAD TLE file: pairs of lines starting with <code>1&nbsp;</code> and
+            <code>2&nbsp;</code>, optionally each preceded by a satellite-name line (the standard 3-line format). Both
+            2-line and 3-line files work.
+          </p>
+          <p style="color:var(--muted);font-size:.88rem;margin:8px 0 2px;">
+            <strong>Output</strong> &mdash; a CelesTrak OMM CSV (<code>stations.tle</code> &rarr; <code>stations.csv</code>)
+            holding exactly the precision the TLE encodes &mdash; nothing is invented. The round-trip
+            <code>TLE&nbsp;&rarr;&nbsp;CSV&nbsp;&rarr;&nbsp;TLE</code> is byte-for-byte identical.
+          </p>
+        </div>
       </details>
     </div>
 
@@ -129,12 +187,52 @@
       var pick = document.getElementById('pick');
       var status = document.getElementById('status');
 
-      // Keep the input's base name; only swap the extension (stations.csv -> stations.txt/.tle).
+      // Per-direction UI configuration.
+      var MODES = {
+        csv2tle: {
+          accept: '.csv,text/csv',
+          verb: 'Drag &amp; drop a CSV file here',
+          hint: 'CelesTrak OMM / CSV format',
+          convert: function (text) { return window.CSVtoTLE.convertCSVtoTLE(text); }
+        },
+        tle2csv: {
+          accept: '.txt,.tle,text/plain',
+          verb: 'Drag &amp; drop a TLE file here',
+          hint: 'NORAD two-line element (.txt / .tle) format',
+          convert: function (text) { return window.CSVtoTLE.convertTLEtoCSV(text); }
+        }
+      };
+
+      function currentDir() {
+        return (document.querySelector('input[name="dir"]:checked') || {}).value || 'csv2tle';
+      }
+
+      // Keep the input's base name; only swap the extension.
+      // csv2tle -> .txt/.tle (user choice);  tle2csv -> .csv
       function outputName(inputName) {
         var dot = inputName.lastIndexOf('.');
         var base = dot > 0 ? inputName.slice(0, dot) : inputName;
-        var ext = (document.querySelector('input[name="ext"]:checked') || {}).value || 'txt';
+        var ext;
+        if (currentDir() === 'tle2csv') {
+          ext = 'csv';
+        } else {
+          ext = (document.querySelector('input[name="ext"]:checked') || {}).value || 'txt';
+        }
         return base + '.' + ext;
+      }
+
+      // Reflect the chosen direction across the whole UI.
+      function applyMode() {
+        var dir = currentDir();
+        var mode = MODES[dir];
+        input.setAttribute('accept', mode.accept);
+        document.getElementById('drop-verb').innerHTML = mode.verb;
+        document.getElementById('drop-hint').textContent = mode.hint;
+        var toCsv = dir === 'tle2csv';
+        document.getElementById('ext-opt').hidden = toCsv;
+        document.getElementById('ext-note').hidden = !toCsv;
+        document.getElementById('help-csv2tle').hidden = toCsv;
+        document.getElementById('help-tle2csv').hidden = !toCsv;
       }
 
       function saveFile(filename, text) {
@@ -229,7 +327,7 @@
         reader.onload = function () {
           var outName = outputName(file.name);
           try {
-            var result = window.CSVtoTLE.convertCSVtoTLE(String(reader.result));
+            var result = MODES[currentDir()].convert(String(reader.result));
             saveFile(outName, result.text);
             renderResult(outName, result);
           } catch (e) {
@@ -253,6 +351,12 @@
           return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
         });
       }
+
+      // Direction selector — re-skin the UI whenever it changes.
+      Array.prototype.forEach.call(document.querySelectorAll('input[name="dir"]'), function (r) {
+        r.addEventListener('change', applyMode);
+      });
+      applyMode();
 
       // Click / keyboard to open the file browser
       pick.addEventListener('click', function (e) { e.stopPropagation(); input.click(); });
