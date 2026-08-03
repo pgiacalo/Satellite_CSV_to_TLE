@@ -128,14 +128,9 @@
         <input type="file" id="file" accept=".csv,text/csv" multiple hidden />
       </div>
 
-      <div class="opt" id="ext-opt">
+      <div class="opt">
         <span class="lbl">Output file type:</span>
-        <label><input type="radio" name="ext" value="txt" checked> <code>.txt</code> <small>&mdash; opens in your text editor</small></label>
-        <label><input type="radio" name="ext" value="tle"> <code>.tle</code> <small>&mdash; standard NORAD extension</small></label>
-      </div>
-      <div class="opt" id="ext-note" hidden>
-        <span class="lbl">Output file type:</span>
-        <span><code>.csv</code> <small>&mdash; standard CelesTrak OMM / CSV format</small></span>
+        <span><code id="ext-label">.tle</code> <small id="ext-desc">&mdash; standard NORAD two-line element extension</small></span>
       </div>
 
       <div id="status"></div>
@@ -152,9 +147,7 @@
           </p>
           <p style="color:var(--muted);font-size:.88rem;margin:8px 0 2px;">
             <strong>Output</strong> &mdash; a standard NORAD two-line element file with the <em>same name</em> as the
-            input, only the extension changes (e.g. <code>stations.csv</code> &rarr; <code>stations.txt</code>).
-            The default <code>.txt</code> opens straight in your text editor; switch to <code>.tle</code> above if a
-            downstream tool expects that extension.
+            input, only the extension changes (e.g. <code>stations.csv</code> &rarr; <code>stations.tle</code>).
           </p>
         </div>
         <div id="help-tle2csv" hidden>
@@ -187,18 +180,23 @@
       var pick = document.getElementById('pick');
       var status = document.getElementById('status');
 
-      // Per-direction UI configuration.
+      // Per-direction UI configuration. The output extension always matches the
+      // destination format — no user choice.
       var MODES = {
         csv2tle: {
           accept: '.csv,text/csv',
           verb: 'Drag &amp; drop a CSV file here',
           hint: 'CelesTrak OMM / CSV format',
+          ext: 'tle',
+          extDesc: '&mdash; standard NORAD two-line element extension',
           convert: function (text) { return window.CSVtoTLE.convertCSVtoTLE(text); }
         },
         tle2csv: {
           accept: '.txt,.tle,text/plain',
           verb: 'Drag &amp; drop a TLE file here',
           hint: 'NORAD two-line element (.txt / .tle) format',
+          ext: 'csv',
+          extDesc: '&mdash; standard CelesTrak OMM / CSV format',
           convert: function (text) { return window.CSVtoTLE.convertTLEtoCSV(text); }
         }
       };
@@ -207,18 +205,11 @@
         return (document.querySelector('input[name="dir"]:checked') || {}).value || 'csv2tle';
       }
 
-      // Keep the input's base name; only swap the extension.
-      // csv2tle -> .txt/.tle (user choice);  tle2csv -> .csv
+      // Keep the input's base name; the extension follows the destination format.
       function outputName(inputName) {
         var dot = inputName.lastIndexOf('.');
         var base = dot > 0 ? inputName.slice(0, dot) : inputName;
-        var ext;
-        if (currentDir() === 'tle2csv') {
-          ext = 'csv';
-        } else {
-          ext = (document.querySelector('input[name="ext"]:checked') || {}).value || 'txt';
-        }
-        return base + '.' + ext;
+        return base + '.' + MODES[currentDir()].ext;
       }
 
       // Reflect the chosen direction across the whole UI.
@@ -228,9 +219,9 @@
         input.setAttribute('accept', mode.accept);
         document.getElementById('drop-verb').innerHTML = mode.verb;
         document.getElementById('drop-hint').textContent = mode.hint;
+        document.getElementById('ext-label').textContent = '.' + mode.ext;
+        document.getElementById('ext-desc').innerHTML = mode.extDesc;
         var toCsv = dir === 'tle2csv';
-        document.getElementById('ext-opt').hidden = toCsv;
-        document.getElementById('ext-note').hidden = !toCsv;
         document.getElementById('help-csv2tle').hidden = toCsv;
         document.getElementById('help-tle2csv').hidden = !toCsv;
       }

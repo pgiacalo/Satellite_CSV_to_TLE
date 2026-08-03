@@ -18,9 +18,9 @@ conversion happens in your browser.
 - **TLE → CSV:** parses a 2-line or 3-line TLE file back into a CelesTrak OMM CSV.
   It emits **exactly the precision the TLE encodes** and never invents digits, so
   the round-trip **TLE → CSV → TLE is byte-for-byte identical** (verified in tests).
-- Output keeps the **same base name** as the input; only the extension changes
-  (`stations.csv` → `stations.txt`). A toggle switches between `.txt` (default —
-  opens straight in your text editor) and `.tle` (standard NORAD extension).
+- Output keeps the **same base name** as the input; only the extension changes to
+  match the destination format — `.tle` when converting CSV → TLE, `.csv` when
+  converting TLE → CSV (`stations.csv` ↔ `stations.tle`).
 - After each conversion you get a clear "saved to Downloads" message, an inline
   **preview**, a **View** button (opens the result in a new tab), and a **Copy** button.
 - No servers, no tracking, no build step, no dependencies. Works offline.
@@ -43,7 +43,7 @@ Grab one from CelesTrak by choosing **CSV** as the format, e.g.
 
 **Output** — a standard NORAD/TLE file, byte-for-byte compatible with CelesTrak's
 own TLE export (verified against 800+ live satellites; see *Testing*). The file
-keeps the input's base name and gets a `.txt` (default) or `.tle` extension.
+keeps the input's base name and gets a `.tle` extension.
 
 ### TLE → CSV (reverse)
 
@@ -67,14 +67,14 @@ the browser **File System Access API**, which the brief also asked to avoid (and
 which several browsers don't support). For the same security reason, a web page
 cannot open your OS file manager or launch a local file. So instead:
 
-- the output keeps the **same base name** (only the extension changes), and
+- the output keeps the **same base name** (only the extension changes to match the
+  destination format), and
 - it saves to your **browser's Downloads folder**, with a clear on-screen message,
   an inline preview, and **View** / **Copy** buttons for the generated data.
 
-**Why `.txt` by default?** macOS/Windows don't recognize the `.tle` extension, so
-double-clicking a `.tle` file pops an "open with…" prompt. Saving as `.txt` makes
-it open directly in your text editor. Flip the toggle to `.tle` if a downstream
-tool needs that extension.
+**Note on the `.tle` extension.** macOS/Windows don't register `.tle`, so
+double-clicking the file may pop an "open with…" prompt — open it from your text
+editor, or use the **View** button to see the result in a new browser tab.
 
 ## Deploying to GitHub Pages
 
